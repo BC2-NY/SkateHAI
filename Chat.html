@@ -1,0 +1,424 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FigureSkateAI — Chat</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script type="importmap">
+{ "imports": { "three": "https://unpkg.com/three@0.160.0/build/three.module.js" } }
+</script>
+<style>
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+html, body, #root { height: 100%; }
+body { font-family: 'Space Grotesk', 'Noto Sans JP', sans-serif; -webkit-font-smoothing: antialiased; background: oklch(0.97 0.008 220); }
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: oklch(0.78 0.006 240); border-radius: 3px; }
+
+:root {
+  --bg:     oklch(0.97 0.008 220);
+  --bg2:    oklch(0.94 0.010 220);
+  --panel:  oklch(0.15 0.035 235);   /* サイドバー濃色（八面体の背景） */
+  --panel2: oklch(0.20 0.040 235);
+  --accent: oklch(0.55 0.15 205);
+  --accent-d: oklch(0.42 0.15 205);
+  --violet: oklch(0.55 0.15 270);
+  --text:   oklch(0.14 0.020 240);
+  --muted:  oklch(0.45 0.010 240);
+  --border: oklch(0.86 0.006 240);
+}
+
+@media (max-width: 700px) {
+  .sidebar { display: none !important; }
+  .msg-max { padding: 0 14px !important; }
+  .input-wrap { padding: 10px 14px 16px !important; }
+  .input-hint { display: none !important; }
+  #hamburger { display: flex !important; }
+}
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<!-- 八面体エンジン（three.js module） -->
+<script type="module">
+import * as THREE from 'three';
+
+const state = {
+  targetSpeed: 0.35,   // 目標回転速度
+  speed: 0.35,
+  targetHue: 0.53,     // 0.53≒水色
+  hue: 0.53,
+  targetGlow: 0.6,
+  glow: 0.6,
+};
+
+let renderer, scene, camera, mesh, wire, mounted = false;
+
+function mount(canvas) {
+  if (mounted || !canvas) return;
+  mounted = true;
+
+  const w = canvas.clientWidth || 220;
+  const h = canvas.clientHeight || 300;
+
+  renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setSize(w, h, false);
+
+  scene = new THREE.Scene();
+  camera = new THREE.PerspectiveCamera(40, w / h, 0.1, 100);
+  camera.position.set(0, 0, 6);
+
+  // 縦長の八面体
+  const geo = new THREE.OctahedronGeometry(1.35, 0);
+  geo.scale(0.72, 1.55, 0.72);
+
+  const mat = new THREE.MeshStandardMaterial({
+    color: new THREE.Color().setHSL(state.hue, 0.75, 0.55),
+    emissive: new THREE.Color().setHSL(state.hue, 0.8, 0.35),
+    emissiveIntensity: 0.6,
+    metalness: 0.35,
+    roughness: 0.25,
+    transparent: true,
+    opacity: 0.92,
+    flatShading: true,
+  });
+  mesh = new THREE.Mesh(geo, mat);
+  scene.add(mesh);
+
+  // ワイヤーフレームの縁取り（結晶感）
+  const wmat = new THREE.LineBasicMaterial({ color: new THREE.Color().setHSL(state.hue, 0.9, 0.85), transparent: true, opacity: 0.5 });
+  wire = new THREE.LineSegments(new THREE.EdgesGeometry(geo), wmat);
+  mesh.add(wire);
+
+  const key = new THREE.DirectionalLight(0xffffff, 1.4); key.position.set(3, 5, 4); scene.add(key);
+  const rim = new THREE.DirectionalLight(0x88ccff, 0.8); rim.position.set(-4, -2, 2); scene.add(rim);
+  scene.add(new THREE.AmbientLight(0x334455, 0.7));
+
+  const clock = new THREE.Clock();
+  function animate() {
+    if (!mounted) return;
+    requestAnimationFrame(animate);
+    const dt = Math.min(clock.getDelta(), 0.05);
+
+    // なめらかに追従
+    state.speed += (state.targetSpeed - state.speed) * Math.min(dt * 3, 1);
+    state.hue   += (state.targetHue - state.hue)   * Math.min(dt * 2.5, 1);
+    state.glow  += (state.targetGlow - state.glow) * Math.min(dt * 3, 1);
+
+    mesh.rotation.y += state.speed * dt;
+    mesh.rotation.x = Math.sin(clock.elapsedTime * 0.4) * 0.12;
+
+    mat.color.setHSL(state.hue, 0.75, 0.55);
+    mat.emissive.setHSL(state.hue, 0.8, 0.30 + state.glow * 0.25);
+    mat.emissiveIntensity = 0.4 + state.glow * 0.7;
+    wire.material.color.setHSL(state.hue, 0.9, 0.85);
+
+    renderer.render(scene, camera);
+  }
+  animate();
+
+  const ro = new ResizeObserver(() => {
+    const nw = canvas.clientWidth, nh = canvas.clientHeight;
+    if (nw && nh) { renderer.setSize(nw, nh, false); camera.aspect = nw / nh; camera.updateProjectionMatrix(); }
+  });
+  ro.observe(canvas);
+}
+
+// moodに応じて回転速度・色・発光を設定
+function setMood(mood) {
+  if (mood === 'thinking')      { state.targetSpeed = 3.2; state.targetGlow = 1.0; }
+  else if (mood === 'technical'){ state.targetSpeed = 1.4; state.targetHue = 0.58; state.targetGlow = 0.85; } // やや青緑
+  else if (mood === 'athlete')  { state.targetSpeed = 1.2; state.targetHue = 0.72; state.targetGlow = 0.8; }  // 紫寄り
+  else if (mood === 'rules')    { state.targetSpeed = 1.1; state.targetHue = 0.50; state.targetGlow = 0.75; } // 水色
+  else /* idle */               { state.targetSpeed = 0.35; state.targetHue = 0.53; state.targetGlow = 0.55; }
+}
+
+window.AriaOcta = { mount, setMood };
+</script>
+
+<script type="text/babel">
+const { useState, useRef, useEffect } = React;
+
+const MSG_KEY  = 'fsai_messages_v3';
+const HIST_KEY = 'fsai_history_v3';
+const API_URL  = 'https://f-igure-skate-a-ichat.vercel.app/api/chat';
+
+const SUGGESTIONS = [
+  'サルコウの跳び方を教えて',
+  'トーループとフリップの違いは？',
+  'ルッツの軸の作り方は？',
+  '坂本花織選手ってどんな人？',
+  'GOEの仕組みを教えて',
+  'ジャンプの空中姿勢のコツは？',
+];
+
+/* 質問内容から八面体のムードを判定 */
+function detectMood(q) {
+  const tech = ['サルコウ','トーループ','トウループ','ループ','フリップ','フィリップ','ルッツ','アクセル','跳び方','軸','エントリー','空中姿勢','構え','スピン','ステップ','トー'];
+  const athlete = ['選手','さん','キャリア','経歴','引退','羽生','宇野','坂本','紀平','ネイサン','チェン','マリニン','鍵山','三浦','木原'];
+  const rules = ['GOE','PCS','採点','基礎点','点数','ルール','得点','ジャッジ','スコア'];
+  if (rules.some(k => q.includes(k)))   return 'rules';
+  if (athlete.some(k => q.includes(k))) return 'athlete';
+  if (tech.some(k => q.includes(k)))    return 'technical';
+  return 'technical';
+}
+
+function renderMD(text) {
+  return text.split('\n').map((line, i) => {
+    if (!line.trim()) return <br key={i} />;
+    const parts = line.split(/(\*\*[^*]+\*\*)/g).map((p, j) =>
+      p.startsWith('**') && p.endsWith('**')
+        ? <strong key={j} style={{ color: 'var(--accent-d)', fontWeight: 700 }}>{p.slice(2, -2)}</strong>
+        : p
+    );
+    if (line.startsWith('- ') || line.startsWith('・')) {
+      return (
+        <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 4, paddingLeft: 4 }}>
+          <span style={{ color: 'var(--accent)', flexShrink: 0 }}>·</span>
+          <span>{parts}</span>
+        </div>
+      );
+    }
+    return <p key={i} style={{ marginBottom: 4, lineHeight: 1.78 }}>{parts}</p>;
+  });
+}
+
+function TypingDots() {
+  return (
+    <div style={{ display: 'flex', gap: 5, padding: '4px 0', alignItems: 'center' }}>
+      {[0, 1, 2].map(i => (
+        <div key={i} style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--accent)', animation: `bounce 1.2s ${i * 0.2}s ease-in-out infinite` }} />
+      ))}
+      <style>{`@keyframes bounce{0%,80%,100%{transform:translateY(0)}40%{transform:translateY(-6px)}}`}</style>
+    </div>
+  );
+}
+
+/* 八面体キャンバス */
+function Octahedron({ big }) {
+  const ref = useRef(null);
+  useEffect(() => {
+    let tries = 0;
+    const id = setInterval(() => {
+      if (window.AriaOcta && ref.current) { window.AriaOcta.mount(ref.current); clearInterval(id); }
+      if (++tries > 60) clearInterval(id);
+    }, 60);
+    return () => clearInterval(id);
+  }, []);
+  return <canvas ref={ref} style={{ width: '100%', height: big ? 260 : 44, display: 'block' }} />;
+}
+
+/* モバイル用ドロワー */
+function Drawer({ open, onClose, onSuggest }) {
+  if (!open) return null;
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 150 }} onClick={onClose}>
+      <div style={{ position: 'absolute', inset: 0, background: '#00000044' }} />
+      <div onClick={e => e.stopPropagation()} style={{ position: 'absolute', left: 0, top: 0, bottom: 0, width: 280, background: 'var(--panel)', display: 'flex', flexDirection: 'column', boxShadow: '4px 0 24px oklch(0.1 0.02 240 / 0.4)' }}>
+        <div style={{ padding: '18px 18px 8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: 'white' }}>Figure<span style={{ color: 'oklch(0.75 0.13 205)' }}>Skate</span>AI</div>
+          <button onClick={onClose} style={{ background: 'transparent', border: 'none', cursor: 'pointer', color: 'oklch(0.7 0.02 240)', fontSize: 22, lineHeight: 1 }}>×</button>
+        </div>
+        <div style={{ padding: '4px 16px 8px' }}><Octahedron big /></div>
+        <div style={{ padding: '4px 10px', flex: 1, overflowY: 'auto' }}>
+          <div style={{ fontSize: 11, color: 'oklch(0.62 0.02 240)', letterSpacing: '0.06em', marginBottom: 8, fontWeight: 600, paddingLeft: 8 }}>よく聞かれる質問</div>
+          {SUGGESTIONS.map((s, i) => (
+            <button key={i} onClick={() => { onSuggest(s); onClose(); }}
+              style={{ display: 'block', width: '100%', textAlign: 'left', background: 'transparent', border: 'none', cursor: 'pointer', padding: '10px 10px', borderRadius: 8, marginBottom: 2, color: 'oklch(0.82 0.01 240)', fontSize: 14, fontFamily: "'Noto Sans JP',sans-serif" }}>
+              {s}
+            </button>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function App() {
+  const initMsgs = () => {
+    try { const s = localStorage.getItem(MSG_KEY); if (s) return JSON.parse(s); } catch (e) {}
+    return [{ id: 0, role: 'ai', text: 'こんにちは！ARIAです⛸ 元選手・コーチの視点でフィギュアスケートの疑問にお答えします。\n\nジャンプの跳び方や軸の作り方、選手のこと、採点ルールまで何でも聞いてください。今日はどんなことが気になりますか？' }];
+  };
+  const initHist = () => { try { const s = localStorage.getItem(HIST_KEY); return s ? JSON.parse(s) : []; } catch (e) { return []; } };
+
+  const [messages,    setMessages]    = useState(initMsgs);
+  const [chatHistory, setChatHistory] = useState(initHist);
+  const [input,       setInput]       = useState('');
+  const [typing,      setTyping]      = useState(false);
+  const [error,       setError]       = useState('');
+  const [drawerOpen,  setDrawerOpen]  = useState(false);
+
+  const scrollAreaRef = useRef(null);
+  const inputRef = useRef(null);
+
+  useEffect(() => { try { localStorage.setItem(MSG_KEY,  JSON.stringify(messages));    } catch (e) {} }, [messages]);
+  useEffect(() => { try { localStorage.setItem(HIST_KEY, JSON.stringify(chatHistory)); } catch (e) {} }, [chatHistory]);
+  useEffect(() => {
+    if (scrollAreaRef.current) scrollAreaRef.current.scrollTo({ top: scrollAreaRef.current.scrollHeight, behavior: 'smooth' });
+  }, [messages, typing]);
+
+  const setMood = (m) => { if (window.AriaOcta) window.AriaOcta.setMood(m); };
+
+  const send = async (text) => {
+    const q = (text || input).trim();
+    if (!q || typing) return;
+
+    setInput('');
+    setError('');
+    setMessages(prev => [...prev, { id: Date.now(), role: 'user', text: q }]);
+    setTyping(true);
+    setMood('thinking');
+
+    try {
+      const res = await fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: q, history: chatHistory })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'APIエラー');
+      setTyping(false);
+      setMessages(prev => [...prev, { id: Date.now() + 1, role: 'ai', text: data.text }]);
+      setChatHistory(data.history);
+      setMood(detectMood(q));
+      setTimeout(() => setMood('idle'), 6000);
+    } catch (err) {
+      setTyping(false);
+      setError('通信エラーが発生しました。もう一度お試しください。');
+      setMood('idle');
+    }
+  };
+
+  return (
+    <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', background: 'var(--bg)' }}>
+
+      {/* ── サイドバー（八面体 = ARIAの存在） ── */}
+      <div className="sidebar" style={{ width: 264, background: 'linear-gradient(180deg, var(--panel) 0%, var(--panel2) 100%)', display: 'flex', flexDirection: 'column', flexShrink: 0 }}>
+        <div style={{ padding: '20px 20px 6px' }}>
+          <a href="Landing Page.html" style={{ textDecoration: 'none' }}>
+            <div style={{ fontSize: 15, fontWeight: 700, color: 'white' }}>Figure<span style={{ color: 'oklch(0.75 0.13 205)' }}>Skate</span>AI</div>
+          </a>
+        </div>
+
+        {/* 八面体 */}
+        <div style={{ padding: '6px 20px 0' }}>
+          <Octahedron big />
+        </div>
+        <div style={{ textAlign: 'center', padding: '2px 20px 18px' }}>
+          <div style={{ fontSize: 16, fontWeight: 600, color: 'white', letterSpacing: '0.02em' }}>ARIA</div>
+          <div style={{ fontSize: 11, color: 'oklch(0.72 0.05 205)', marginTop: 2 }}>元フィギュアスケート選手 / AIコーチ</div>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 10, background: 'oklch(0.55 0.15 205 / 0.18)', border: '1px solid oklch(0.6 0.15 205 / 0.35)', borderRadius: 100, padding: '4px 12px' }}>
+            <span style={{ width: 6, height: 6, borderRadius: '50%', background: 'oklch(0.75 0.16 145)', display: 'inline-block' }} />
+            <span style={{ fontSize: 11, color: 'oklch(0.82 0.06 205)', fontFamily: "'Noto Sans JP',sans-serif" }}>{typing ? '思考中…' : 'オンライン'}</span>
+          </div>
+        </div>
+
+        <div style={{ padding: '10px 12px', flex: 1, overflowY: 'auto', borderTop: '1px solid oklch(0.3 0.03 235)' }}>
+          <div style={{ fontSize: 11, color: 'oklch(0.62 0.02 240)', letterSpacing: '0.06em', marginBottom: 8, fontWeight: 600, paddingLeft: 8, marginTop: 6 }}>よく聞かれる質問</div>
+          {SUGGESTIONS.map((s, i) => (
+            <button key={i} onClick={() => { setInput(s); inputRef.current?.focus(); }}
+              style={{ display: 'block', width: '100%', textAlign: 'left', background: 'transparent', border: 'none', cursor: 'pointer', padding: '9px 10px', borderRadius: 8, marginBottom: 2, color: 'oklch(0.80 0.01 240)', fontSize: 13, fontFamily: "'Noto Sans JP',sans-serif", transition: 'all 0.15s' }}
+              onMouseEnter={e => { e.currentTarget.style.background = 'oklch(0.55 0.15 205 / 0.18)'; e.currentTarget.style.color = 'white'; }}
+              onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'oklch(0.80 0.01 240)'; }}>
+              {s}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* ── メインエリア ── */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
+
+        {/* トップバー */}
+        <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 10, background: 'white', flexShrink: 0 }}>
+          <button onClick={() => setDrawerOpen(true)} id="hamburger"
+            style={{ display: 'none', background: 'transparent', border: 'none', cursor: 'pointer', padding: 4, color: 'var(--muted)', flexShrink: 0 }}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+          </button>
+          <div style={{ width: 34, height: 34, borderRadius: '50%', background: 'linear-gradient(135deg, var(--accent), var(--violet))', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, fontWeight: 700, color: 'white', flexShrink: 0 }}>AR</div>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', whiteSpace: 'nowrap' }}>ARIA</div>
+            <div style={{ fontSize: 11, color: 'var(--accent-d)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{typing ? '入力中…' : 'フィギュアスケートAIコーチ'}</div>
+          </div>
+        </div>
+
+        {/* メッセージ一覧 */}
+        <div ref={scrollAreaRef} style={{ flex: 1, overflowY: 'auto', padding: '22px 0' }}>
+          <div className="msg-max" style={{ maxWidth: 720, margin: '0 auto', padding: '0 20px' }}>
+            {messages.map(m => (
+              <div key={m.id} style={{ display: 'flex', flexDirection: m.role === 'user' ? 'row-reverse' : 'row', gap: 10, marginBottom: 18, alignItems: 'flex-start' }}>
+                {m.role === 'ai' && (
+                  <div style={{ width: 30, height: 30, borderRadius: '50%', flexShrink: 0, background: 'linear-gradient(135deg, var(--accent), var(--violet))', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700, color: 'white', marginTop: 4 }}>AR</div>
+                )}
+                <div style={{
+                  maxWidth: '82%',
+                  background: m.role === 'user' ? 'var(--accent)' : 'white',
+                  border: m.role === 'user' ? 'none' : '1px solid var(--border)',
+                  borderRadius: m.role === 'user' ? '16px 16px 4px 16px' : '4px 16px 16px 16px',
+                  padding: '11px 15px', fontSize: 14, fontFamily: "'Noto Sans JP',sans-serif",
+                  color: m.role === 'user' ? 'white' : 'var(--text)', lineHeight: 1.7,
+                  boxShadow: m.role === 'ai' ? '0 1px 4px oklch(0.45 0.01 240 / 0.06)' : 'none',
+                  wordBreak: 'break-word',
+                }}>
+                  {m.role === 'ai' ? renderMD(m.text) : m.text}
+                </div>
+              </div>
+            ))}
+
+            {typing && (
+              <div style={{ display: 'flex', gap: 10, marginBottom: 18, alignItems: 'flex-start' }}>
+                <div style={{ width: 30, height: 30, borderRadius: '50%', flexShrink: 0, background: 'linear-gradient(135deg, var(--accent), var(--violet))', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700, color: 'white', marginTop: 4 }}>AR</div>
+                <div style={{ background: 'white', border: '1px solid var(--border)', borderRadius: '4px 16px 16px 16px', padding: '12px 16px', boxShadow: '0 1px 4px oklch(0.45 0.01 240 / 0.06)' }}>
+                  <TypingDots />
+                </div>
+              </div>
+            )}
+
+            {error && (
+              <div style={{ textAlign: 'center', padding: '8px 14px', color: 'oklch(0.45 0.15 25)', fontSize: 13, fontFamily: "'Noto Sans JP',sans-serif", background: 'oklch(0.97 0.03 25)', border: '1px solid oklch(0.88 0.05 25)', borderRadius: 8, marginBottom: 14 }}>
+                {error}
+              </div>
+            )}
+            <div />
+          </div>
+        </div>
+
+        {/* 入力エリア */}
+        <div className="input-wrap" style={{ padding: '10px 16px 18px', background: 'white', borderTop: '1px solid var(--border)', flexShrink: 0 }}>
+          <div style={{ maxWidth: 720, margin: '0 auto' }}>
+            <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 12, padding: '10px 12px' }}>
+              <textarea ref={inputRef} value={input}
+                onChange={e => setInput(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }}
+                placeholder="ARIAに質問する…"
+                disabled={typing}
+                style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', color: 'var(--text)', fontSize: 15, resize: 'none', maxHeight: 100, fontFamily: "'Noto Sans JP',sans-serif", lineHeight: 1.6, minHeight: 24 }}
+                rows={1} />
+              <button onClick={() => send()} disabled={!input.trim() || typing}
+                style={{ width: 38, height: 38, borderRadius: 9, border: 'none', cursor: input.trim() && !typing ? 'pointer' : 'default', background: input.trim() && !typing ? 'var(--accent)' : 'var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center', transition: 'background 0.2s', flexShrink: 0 }}>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+              </button>
+            </div>
+            <p className="input-hint" style={{ fontSize: 11, color: 'var(--muted)', marginTop: 6, textAlign: 'center', fontFamily: "'Noto Sans JP',sans-serif" }}>
+              Enter で送信 · Shift+Enter で改行
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <Drawer open={drawerOpen} onClose={() => setDrawerOpen(false)} onSuggest={s => { setInput(s); inputRef.current?.focus(); }} />
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
