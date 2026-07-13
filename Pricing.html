@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FigureSkateAI — 料金プラン</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+<script type="text/babel" src="tweaks-panel.jsx"></script>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body { font-family:'Space Grotesk','Noto Sans JP',sans-serif; min-height:100vh; }
+::-webkit-scrollbar{width:6px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:oklch(0.25 0.015 240);border-radius:3px}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const { useState } = React;
+
+const TWEAK_DEFAULTS = /*EDITMODE-BEGIN*/{
+  "theme": "arctic",
+  "billing": "annual",
+  "monthlyPrice": 500,
+  "annualDiscount": 20
+}/*EDITMODE-END*/;
+
+const THEMES = {
+  ice: {
+    bg:'oklch(0.09 0.020 240)', bg2:'oklch(0.13 0.020 240)', bg3:'oklch(0.17 0.018 238)',
+    accent:'oklch(0.70 0.16 200)', violet:'oklch(0.68 0.16 270)',
+    text:'oklch(0.97 0.005 240)', muted:'oklch(0.55 0.010 240)', border:'oklch(0.22 0.013 240)',
+  },
+  midnight: {
+    bg:'oklch(0.08 0.025 280)', bg2:'oklch(0.12 0.025 280)', bg3:'oklch(0.16 0.022 278)',
+    accent:'oklch(0.72 0.18 290)', violet:'oklch(0.65 0.20 310)',
+    text:'oklch(0.97 0.005 280)', muted:'oklch(0.55 0.012 280)', border:'oklch(0.22 0.018 280)',
+  },
+  arctic: {
+    bg:'oklch(0.97 0.008 220)', bg2:'oklch(0.93 0.008 220)', bg3:'oklch(0.89 0.008 220)',
+    accent:'oklch(0.48 0.16 200)', violet:'oklch(0.50 0.16 270)',
+    text:'oklch(0.12 0.020 240)', muted:'oklch(0.45 0.010 240)', border:'oklch(0.82 0.006 240)',
+  },
+};
+
+const FEATURES = [
+  {label:'ARIAへの質問',         free:'3回まで',      premium:'無制限'},
+  {label:'技術解説の深さ',       free:'基本のみ',      premium:'競技者レベル詳細'},
+  {label:'選手プロフィール',     free:'一部のみ',      premium:'200名以上すべて'},
+  {label:'採点ルール解説',       free:'◯',            premium:'◯'},
+  {label:'過去の試合分析',       free:'✕',            premium:'◯'},
+  {label:'会話の保存・履歴',     free:'✕',            premium:'◯'},
+  {label:'優先サポート',         free:'✕',            premium:'◯'},
+];
+
+const FAQS = [
+  {q:'無料プランはいつまでですか？', a:'期間制限はありません。3回の無料質問を使い切るまでご利用いただけます。'},
+  {q:'クレジットカードは必要ですか？', a:'無料トライアルはカード不要。プレミアムへのアップグレード時にStripeで安全に決済できます。'},
+  {q:'いつでもキャンセルできますか？', a:'はい、いつでもキャンセル可能です。解約後も期間終了まで利用できます。'},
+  {q:'年額プランはいつでも月額に変更できますか？', a:'次の更新タイミングでプランを変更できます。'},
+  {q:'ARIAはどんな情報を持っていますか？', a:'技術・ルール・選手データ・試合情報をカバー。AIにより最新の質問にも柔軟に対応します。'},
+];
+
+function CheckIcon({color}) {
+  return <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>;
+}
+function XIcon({color}) {
+  return <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>;
+}
+
+function FAQ({q, a, t}) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div style={{borderBottom:`1px solid ${t.border}`}}>
+      <button onClick={()=>setOpen(!open)} style={{width:'100%',textAlign:'left',background:'transparent',border:'none',padding:'18px 0',cursor:'pointer',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+        <span style={{fontSize:15,fontWeight:500,color:t.text,fontFamily:"'Noto Sans JP',sans-serif"}}>{q}</span>
+        <span style={{color:t.accent,fontSize:20,transition:'transform 0.2s',display:'block',transform:open?'rotate(45deg)':'none'}}>+</span>
+      </button>
+      {open && <p style={{color:t.muted,fontSize:14,lineHeight:1.75,paddingBottom:18,fontFamily:"'Noto Sans JP',sans-serif"}}>{a}</p>}
+    </div>
+  );
+}
+
+function App() {
+  const [tweaks, setTweak] = useTweaks(TWEAK_DEFAULTS);
+  const t = THEMES[tweaks.theme] || THEMES.ice;
+
+  const discountRate = tweaks.annualDiscount / 100;
+  const baseMonthly = tweaks.monthlyPrice;
+  const annualMonthly = Math.round(baseMonthly * (1 - discountRate));
+  const annualTotal = annualMonthly * 12;
+  const displayMonthly = tweaks.billing === 'annual' ? annualMonthly : baseMonthly;
+
+  const [showForm, setShowForm] = useState(false);
+  const [form, setForm] = useState({email:'',name:''});
+  const [submitted, setSubmitted] = useState(false);
+
+  return (
+    <div style={{minHeight:'100vh',background:t.bg,color:t.text}}>
+      {/* Nav */}
+      <nav style={{borderBottom:`1px solid ${t.border}`,padding:'22px 60px',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+        <a href="Landing Page.html" style={{textDecoration:'none',fontSize:17,fontWeight:700,color:t.text}}>
+          Figure<span style={{color:t.accent}}>Skate</span>AI
+        </a>
+        <div style={{display:'flex',gap:28}}>
+          <a href="Chat.html" style={{color:t.muted,fontSize:14,textDecoration:'none'}}>チャット</a>
+          <a href="Pricing.html" style={{color:t.accent,fontSize:14,textDecoration:'none',fontWeight:600}}>料金</a>
+        </div>
+      </nav>
+
+      <div style={{maxWidth:1060,margin:'0 auto',padding:'72px 40px 100px'}}>
+        {/* Header */}
+        <div style={{textAlign:'center',marginBottom:52}}>
+          <div style={{display:'inline-flex',alignItems:'center',gap:8,background:`${t.accent}18`,border:`1px solid ${t.accent}44`,color:t.accent,padding:'5px 16px',borderRadius:100,fontSize:12,fontWeight:600,letterSpacing:'0.06em',marginBottom:22}}>⛸ PRICING</div>
+          <h1 style={{fontSize:50,fontWeight:700,color:t.text,letterSpacing:'-0.03em',lineHeight:1.1,marginBottom:14}}>シンプルな料金体系</h1>
+          <p style={{fontSize:16,color:t.muted,fontFamily:"'Noto Sans JP',sans-serif",lineHeight:1.65}}>無料で始めて、もっと深く知りたくなったらアップグレード。<br/>いつでもキャンセルできます。</p>
+
+          {/* Billing toggle */}
+          <div style={{display:'inline-flex',alignItems:'center',background:t.bg2,border:`1px solid ${t.border}`,borderRadius:10,padding:4,marginTop:32,gap:2}}>
+            {['monthly','annual'].map(b => (
+              <button key={b} onClick={()=>setTweak('billing',b)} style={{padding:'8px 22px',borderRadius:8,border:'none',cursor:'pointer',background:tweaks.billing===b?t.accent:'transparent',color:tweaks.billing===b?t.bg2:t.muted,fontWeight:tweaks.billing===b?700:400,fontSize:14,transition:'all 0.2s',fontFamily:"'Noto Sans JP',sans-serif"}}>
+                {b==='monthly'?'月額':'年額'}
+                {b==='annual' && <span style={{marginLeft:6,background:tweaks.billing==='annual'?t.bg2:`${t.accent}22`,color:t.accent,padding:'2px 7px',borderRadius:4,fontSize:11,fontWeight:700}}>{tweaks.annualDiscount}%OFF</span>}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Plans */}
+        <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:22,marginBottom:68}}>
+          {/* Free */}
+          <div style={{background:t.bg2,border:`1px solid ${t.border}`,borderRadius:16,padding:'34px 30px'}}>
+            <div style={{fontSize:12,color:t.muted,fontWeight:600,letterSpacing:'0.06em',marginBottom:10}}>FREE</div>
+            <div style={{display:'flex',alignItems:'baseline',gap:6,marginBottom:6}}>
+              <span style={{fontSize:46,fontWeight:700,color:t.text,letterSpacing:'-0.03em'}}>¥0</span>
+            </div>
+            <p style={{fontSize:14,color:t.muted,fontFamily:"'Noto Sans JP',sans-serif",marginBottom:26}}>まずは試してみる</p>
+            <a href="Chat.html" style={{display:'block',textAlign:'center',background:'transparent',border:`1px solid ${t.border}`,color:t.text,padding:'13px 0',borderRadius:9,fontSize:14,fontWeight:600,textDecoration:'none',marginBottom:26,fontFamily:"'Noto Sans JP',sans-serif"}}>無料で始める</a>
+            <div style={{display:'flex',flexDirection:'column',gap:11}}>
+              {['ARIAへの質問 3回まで','基本的な技術解説','採点ルール解説（一部）'].map(f=>(
+                <div key={f} style={{display:'flex',alignItems:'center',gap:10}}><CheckIcon color={t.muted}/><span style={{fontSize:14,color:t.muted,fontFamily:"'Noto Sans JP',sans-serif"}}>{f}</span></div>
+              ))}
+              {['過去の試合分析','会話履歴の保存','優先サポート'].map(f=>(
+                <div key={f} style={{display:'flex',alignItems:'center',gap:10}}><XIcon color={t.border}/><span style={{fontSize:14,color:`${t.muted}88`,fontFamily:"'Noto Sans JP',sans-serif"}}>{f}</span></div>
+              ))}
+            </div>
+          </div>
+
+          {/* Premium */}
+          <div style={{background:`linear-gradient(155deg,${t.bg3} 0%,${t.bg2} 100%)`,border:`1.5px solid ${t.accent}55`,borderRadius:16,padding:'34px 30px',position:'relative',overflow:'hidden'}}>
+            <div style={{position:'absolute',top:14,right:14,background:t.accent,color:t.bg2,padding:'3px 12px',borderRadius:100,fontSize:11,fontWeight:700}}>おすすめ</div>
+            <div style={{position:'absolute',top:-60,right:-60,width:200,height:200,borderRadius:'50%',background:`radial-gradient(circle,${t.accent}18 0%,transparent 70%)`}}/>
+            <div style={{fontSize:12,color:t.accent,fontWeight:600,letterSpacing:'0.06em',marginBottom:10,position:'relative'}}>PREMIUM</div>
+            <div style={{display:'flex',alignItems:'baseline',gap:6,marginBottom:4,position:'relative'}}>
+              <span style={{fontSize:46,fontWeight:700,color:t.text,letterSpacing:'-0.03em'}}>¥{displayMonthly.toLocaleString()}</span>
+              <span style={{fontSize:15,color:t.muted}}>/月</span>
+            </div>
+            {tweaks.billing==='annual' && <p style={{fontSize:13,color:t.muted,marginBottom:4,fontFamily:"'Noto Sans JP',sans-serif",position:'relative'}}>年額 ¥{annualTotal.toLocaleString()} <span style={{color:t.accent,fontWeight:700}}>（{tweaks.annualDiscount}%お得）</span></p>}
+            <p style={{fontSize:14,color:t.muted,fontFamily:"'Noto Sans JP',sans-serif",marginBottom:26,position:'relative'}}>ARIAと無制限に話す</p>
+            <button onClick={()=>setShowForm(true)} style={{display:'block',width:'100%',textAlign:'center',background:t.accent,color:t.bg2,padding:'14px 0',borderRadius:9,fontSize:15,fontWeight:700,border:'none',cursor:'pointer',marginBottom:26,fontFamily:"'Noto Sans JP',sans-serif",boxShadow:`0 0 28px ${t.accent}33`,position:'relative'}}>今すぐ始める →</button>
+            <div style={{display:'flex',flexDirection:'column',gap:11,position:'relative'}}>
+              {['ARIAへの質問 無制限','競技者レベルの詳細解説','選手プロフィール 200名以上','採点ルール完全解説','過去の試合分析','会話履歴の保存','優先サポート'].map(f=>(
+                <div key={f} style={{display:'flex',alignItems:'center',gap:10}}><CheckIcon color={t.accent}/><span style={{fontSize:14,color:t.text,fontFamily:"'Noto Sans JP',sans-serif"}}>{f}</span></div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Comparison table */}
+        <div style={{marginBottom:72}}>
+          <h2 style={{fontSize:26,fontWeight:700,color:t.text,marginBottom:26,textAlign:'center',letterSpacing:'-0.02em'}}>プランを比較する</h2>
+          <div style={{background:t.bg2,border:`1px solid ${t.border}`,borderRadius:14,overflow:'hidden'}}>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',borderBottom:`1px solid ${t.border}`}}>
+              <div style={{padding:'14px 22px'}}/>
+              <div style={{padding:'14px 22px',textAlign:'center',fontSize:13,fontWeight:600,color:t.muted,borderLeft:`1px solid ${t.border}`}}>無料</div>
+              <div style={{padding:'14px 22px',textAlign:'center',fontSize:13,fontWeight:700,color:t.accent,borderLeft:`1px solid ${t.border}`}}>プレミアム</div>
+            </div>
+            {FEATURES.map((f,i)=>(
+              <div key={i} style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',borderBottom:i<FEATURES.length-1?`1px solid ${t.border}`:'none'}}>
+                <div style={{padding:'13px 22px',fontSize:14,color:t.text,fontFamily:"'Noto Sans JP',sans-serif"}}>{f.label}</div>
+                <div style={{padding:'13px 22px',textAlign:'center',borderLeft:`1px solid ${t.border}`,display:'flex',alignItems:'center',justifyContent:'center'}}>
+                  {f.free==='✕'?<XIcon color={t.border}/>:f.free==='◯'?<CheckIcon color={t.muted}/>:<span style={{fontSize:13,color:t.muted,fontFamily:"'Noto Sans JP',sans-serif"}}>{f.free}</span>}
+                </div>
+                <div style={{padding:'13px 22px',textAlign:'center',borderLeft:`1px solid ${t.border}`,display:'flex',alignItems:'center',justifyContent:'center'}}>
+                  {f.premium==='✕'?<XIcon color={t.border}/>:f.premium==='◯'?<CheckIcon color={t.accent}/>:<span style={{fontSize:13,color:t.accent,fontWeight:600,fontFamily:"'Noto Sans JP',sans-serif"}}>{f.premium}</span>}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* FAQ */}
+        <div style={{maxWidth:660,margin:'0 auto'}}>
+          <h2 style={{fontSize:26,fontWeight:700,color:t.text,marginBottom:28,textAlign:'center',letterSpacing:'-0.02em'}}>よくある質問</h2>
+          {FAQS.map((faq,i)=><FAQ key={i} {...faq} t={t}/>)}
+        </div>
+      </div>
+
+      {/* Sign-up modal */}
+      {showForm && !submitted && (
+        <div style={{position:'fixed',inset:0,background:'#00000088',display:'flex',alignItems:'center',justifyContent:'center',zIndex:100,backdropFilter:'blur(10px)'}}>
+          <div style={{background:t.bg2,border:`1px solid ${t.border}`,borderRadius:20,padding:'42px 38px',maxWidth:430,width:'90%'}}>
+            <h2 style={{color:t.text,fontSize:22,fontWeight:700,marginBottom:6,letterSpacing:'-0.02em'}}>プレミアムを始める</h2>
+            <p style={{color:t.muted,fontSize:14,marginBottom:26,fontFamily:"'Noto Sans JP',sans-serif"}}>月額¥{displayMonthly.toLocaleString()} · Stripeで安全に決済</p>
+            <form onSubmit={e=>{e.preventDefault();setSubmitted(true);}}>
+              {[{label:'お名前',key:'name',type:'text',ph:'山田 花子'},{label:'メールアドレス',key:'email',type:'email',ph:'you@example.com'}].map(f=>(
+                <div key={f.key} style={{marginBottom:14}}>
+                  <label style={{display:'block',fontSize:13,color:t.muted,marginBottom:5,fontFamily:"'Noto Sans JP',sans-serif"}}>{f.label}</label>
+                  <input type={f.type} required placeholder={f.ph} value={form[f.key]} onChange={e=>setForm(p=>({...p,[f.key]:e.target.value}))}
+                    style={{width:'100%',background:t.bg3,border:`1px solid ${t.border}`,borderRadius:8,padding:'11px 13px',color:t.text,fontSize:14,outline:'none',fontFamily:"'Noto Sans JP',sans-serif"}}/>
+                </div>
+              ))}
+              <div style={{background:t.bg3,border:`1px solid ${t.border}`,borderRadius:8,padding:'13px',marginBottom:22}}>
+                <div style={{fontSize:12,color:t.muted,marginBottom:7,fontFamily:"'Noto Sans JP',sans-serif"}}>カード情報（Stripe）</div>
+                <div style={{background:t.bg2,borderRadius:6,padding:'10px 12px',display:'flex',alignItems:'center',gap:8}}>
+                  <svg width="20" height="14" viewBox="0 0 40 28" fill="none"><rect width="40" height="28" rx="4" fill={t.bg3}/><rect x="0" y="9" width="40" height="7" fill={t.border}/></svg>
+                  <span style={{fontSize:13,color:t.muted,fontFamily:'monospace'}}>•••• •••• •••• ••••</span>
+                </div>
+                <p style={{fontSize:11,color:`${t.muted}88`,marginTop:7,fontFamily:"'Noto Sans JP',sans-serif"}}>実際の実装ではStripe Elementsが表示されます</p>
+              </div>
+              <button type="submit" style={{width:'100%',background:t.accent,color:t.bg2,padding:'14px 0',borderRadius:9,fontSize:15,fontWeight:700,border:'none',cursor:'pointer',fontFamily:"'Noto Sans JP',sans-serif",marginBottom:10}}>¥{displayMonthly.toLocaleString()}/月で始める</button>
+              <button type="button" onClick={()=>setShowForm(false)} style={{width:'100%',background:'transparent',border:`1px solid ${t.border}`,color:t.muted,padding:'12px 0',borderRadius:9,fontSize:14,cursor:'pointer',fontFamily:"'Noto Sans JP',sans-serif"}}>キャンセル</button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {submitted && (
+        <div style={{position:'fixed',inset:0,background:'#00000088',display:'flex',alignItems:'center',justifyContent:'center',zIndex:100,backdropFilter:'blur(10px)'}}>
+          <div style={{background:t.bg2,border:`1px solid ${t.border}`,borderRadius:20,padding:'46px 40px',maxWidth:380,width:'90%',textAlign:'center'}}>
+            <div style={{width:60,height:60,borderRadius:'50%',margin:'0 auto 18px',background:`linear-gradient(135deg,${t.accent},${t.violet})`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:26}}>⛸</div>
+            <h2 style={{color:t.text,fontSize:22,fontWeight:700,marginBottom:10}}>ようこそ！</h2>
+            <p style={{color:t.muted,fontSize:14,lineHeight:1.75,marginBottom:26,fontFamily:"'Noto Sans JP',sans-serif"}}>プレミアムプランへの登録が完了しました。<br/>ARIAと無制限に話せます！</p>
+            <a href="Chat.html" style={{display:'block',background:t.accent,color:t.bg2,padding:'14px 0',borderRadius:10,fontWeight:700,fontSize:15,textDecoration:'none',fontFamily:"'Noto Sans JP',sans-serif"}}>ARIAに話しかける →</a>
+          </div>
+        </div>
+      )}
+
+      <TweaksPanel>
+        <TweakSection label="カラーテーマ">
+          <TweakRadio id="theme" value={tweaks.theme}
+            options={[{value:'ice',label:'❄️ アイスブルー'},{value:'midnight',label:'🌙 ミッドナイト紫'},{value:'arctic',label:'☁️ アークティック白'}]}
+            onChange={v=>setTweak('theme',v)}/>
+        </TweakSection>
+        <TweakSection label="料金設定">
+          <TweakNumber id="monthlyPrice" label="月額（円）" value={tweaks.monthlyPrice} min={300} max={2000} step={100} onChange={v=>setTweak('monthlyPrice',v)}/>
+          <TweakSlider id="annualDiscount" label={`年額割引 ${tweaks.annualDiscount}%`} value={tweaks.annualDiscount} min={5} max={40} step={5} onChange={v=>setTweak('annualDiscount',v)}/>
+        </TweakSection>
+        <TweakSection label="ページ移動">
+          <TweakButton label="🏠 ランディングページ" onClick={()=>location.href='Landing Page.html'}/>
+          <TweakButton label="💬 チャットページ" onClick={()=>location.href='Chat.html'}/>
+        </TweakSection>
+      </TweaksPanel>
+    </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+</body>
+</html>
