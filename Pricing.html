@@ -102,11 +102,11 @@ function App() {
     <div style={{minHeight:'100vh',background:t.bg,color:t.text}}>
       {/* Nav */}
       <nav style={{borderBottom:`1px solid ${t.border}`,padding:'22px 60px',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-        <a href="Landing Page.html" style={{textDecoration:'none',fontSize:17,fontWeight:700,color:t.text}}>
+        <a href="index.html" style={{textDecoration:'none',fontSize:17,fontWeight:700,color:t.text}}>
           Figure<span style={{color:t.accent}}>Skate</span>AI
         </a>
         <div style={{display:'flex',gap:28}}>
-          <a href="Chat.html" style={{color:t.muted,fontSize:14,textDecoration:'none'}}>チャット</a>
+          <a href="index.html" style={{color:t.muted,fontSize:14,textDecoration:'none'}}>チャット</a>
           <a href="Pricing.html" style={{color:t.accent,fontSize:14,textDecoration:'none',fontWeight:600}}>料金</a>
         </div>
       </nav>
@@ -138,7 +138,7 @@ function App() {
               <span style={{fontSize:46,fontWeight:700,color:t.text,letterSpacing:'-0.03em'}}>¥0</span>
             </div>
             <p style={{fontSize:14,color:t.muted,fontFamily:"'Noto Sans JP',sans-serif",marginBottom:26}}>まずは試してみる</p>
-            <a href="Chat.html" style={{display:'block',textAlign:'center',background:'transparent',border:`1px solid ${t.border}`,color:t.text,padding:'13px 0',borderRadius:9,fontSize:14,fontWeight:600,textDecoration:'none',marginBottom:26,fontFamily:"'Noto Sans JP',sans-serif"}}>無料で始める</a>
+            <a href="index.html" style={{display:'block',textAlign:'center',background:'transparent',border:`1px solid ${t.border}`,color:t.text,padding:'13px 0',borderRadius:9,fontSize:14,fontWeight:600,textDecoration:'none',marginBottom:26,fontFamily:"'Noto Sans JP',sans-serif"}}>無料で始める</a>
             <div style={{display:'flex',flexDirection:'column',gap:11}}>
               {['ARIAへの質問 3回まで','基本的な技術解説','採点ルール解説（一部）'].map(f=>(
                 <div key={f} style={{display:'flex',alignItems:'center',gap:10}}><CheckIcon color={t.muted}/><span style={{fontSize:14,color:t.muted,fontFamily:"'Noto Sans JP',sans-serif"}}>{f}</span></div>
@@ -234,7 +234,7 @@ function App() {
             <div style={{width:60,height:60,borderRadius:'50%',margin:'0 auto 18px',background:`linear-gradient(135deg,${t.accent},${t.violet})`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:26}}>⛸</div>
             <h2 style={{color:t.text,fontSize:22,fontWeight:700,marginBottom:10}}>ようこそ！</h2>
             <p style={{color:t.muted,fontSize:14,lineHeight:1.75,marginBottom:26,fontFamily:"'Noto Sans JP',sans-serif"}}>プレミアムプランへの登録が完了しました。<br/>ARIAと無制限に話せます！</p>
-            <a href="Chat.html" style={{display:'block',background:t.accent,color:t.bg2,padding:'14px 0',borderRadius:10,fontWeight:700,fontSize:15,textDecoration:'none',fontFamily:"'Noto Sans JP',sans-serif"}}>ARIAに話しかける →</a>
+            <a href="index.html" style={{display:'block',background:t.accent,color:t.bg2,padding:'14px 0',borderRadius:10,fontWeight:700,fontSize:15,textDecoration:'none',fontFamily:"'Noto Sans JP',sans-serif"}}>ARIAに話しかける →</a>
           </div>
         </div>
       )}
@@ -250,8 +250,7 @@ function App() {
           <TweakSlider id="annualDiscount" label={`年額割引 ${tweaks.annualDiscount}%`} value={tweaks.annualDiscount} min={5} max={40} step={5} onChange={v=>setTweak('annualDiscount',v)}/>
         </TweakSection>
         <TweakSection label="ページ移動">
-          <TweakButton label="🏠 ランディングページ" onClick={()=>location.href='Landing Page.html'}/>
-          <TweakButton label="💬 チャットページ" onClick={()=>location.href='Chat.html'}/>
+          <TweakButton label="💬 チャットページ" onClick={()=>location.href='index.html'}/>
         </TweakSection>
       </TweaksPanel>
     </div>
