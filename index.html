@@ -57,9 +57,15 @@ const state = {
   hue: 0.53,
   targetGlow: 0.6,
   glow: 0.6,
+  targetTiltX: 0,      // マウス追従の傾き
+  targetTiltY: 0,
+  tiltX: 0,
+  tiltY: 0,
+  burst: 0,            // クリック時の回転インパルス（減衰）
+  pulse: 0,            // 応答時のスケールポップ（減衰）
 };
 
-let renderer, scene, camera, mesh, wire, mounted = false;
+let renderer, scene, camera, mesh, wire, particles, pMat, mounted = false;
 
 function mount(canvas) {
   if (mounted || !canvas) return;
@@ -98,9 +104,35 @@ function mount(canvas) {
   wire = new THREE.LineSegments(new THREE.EdgesGeometry(geo), wmat);
   mesh.add(wire);
 
+  // 氷の結晶パーティクル（周囲を漂う）
+  const pCount = 48;
+  const pPos = new Float32Array(pCount * 3);
+  for (let i = 0; i < pCount; i++) {
+    const r = 1.6 + Math.random() * 1.2;
+    const th = Math.random() * Math.PI * 2;
+    pPos[i * 3]     = Math.cos(th) * r;
+    pPos[i * 3 + 1] = (Math.random() - 0.5) * 3.4;
+    pPos[i * 3 + 2] = Math.sin(th) * r;
+  }
+  const pGeo = new THREE.BufferGeometry();
+  pGeo.setAttribute('position', new THREE.BufferAttribute(pPos, 3));
+  pMat = new THREE.PointsMaterial({ color: 0xaaddff, size: 0.05, transparent: true, opacity: 0.5, sizeAttenuation: true });
+  particles = new THREE.Points(pGeo, pMat);
+  scene.add(particles);
+
   const key = new THREE.DirectionalLight(0xffffff, 1.4); key.position.set(3, 5, 4); scene.add(key);
   const rim = new THREE.DirectionalLight(0x88ccff, 0.8); rim.position.set(-4, -2, 2); scene.add(rim);
   scene.add(new THREE.AmbientLight(0x334455, 0.7));
+
+  // マウス追従（カーソルの方へ傾く）／クリックで回転バースト
+  canvas.style.cursor = 'pointer';
+  canvas.addEventListener('pointermove', (e) => {
+    const r = canvas.getBoundingClientRect();
+    state.targetTiltY = ((e.clientX - r.left) / r.width  - 0.5) * 0.8;
+    state.targetTiltX = ((e.clientY - r.top)  / r.height - 0.5) * 0.55;
+  });
+  canvas.addEventListener('pointerleave', () => { state.targetTiltX = 0; state.targetTiltY = 0; });
+  canvas.addEventListener('pointerdown', () => { state.burst = 8; state.glow = 1.2; });
 
   const clock = new THREE.Clock();
   function animate() {
@@ -112,14 +144,27 @@ function mount(canvas) {
     state.speed += (state.targetSpeed - state.speed) * Math.min(dt * 3, 1);
     state.hue   += (state.targetHue - state.hue)   * Math.min(dt * 2.5, 1);
     state.glow  += (state.targetGlow - state.glow) * Math.min(dt * 3, 1);
+    state.tiltX += (state.targetTiltX - state.tiltX) * Math.min(dt * 4, 1);
+    state.tiltY += (state.targetTiltY - state.tiltY) * Math.min(dt * 4, 1);
+    state.burst *= Math.pow(0.25, dt);   // バースト減衰
+    state.pulse *= Math.pow(0.12, dt);   // パルス減衰
 
-    mesh.rotation.y += state.speed * dt;
-    mesh.rotation.x = Math.sin(clock.elapsedTime * 0.4) * 0.12;
+    mesh.rotation.y += (state.speed + state.burst) * dt;
+    mesh.rotation.x = Math.sin(clock.elapsedTime * 0.4) * 0.12 + state.tiltX;
+    mesh.rotation.z = -state.tiltY * 0.5;
+    mesh.position.y = Math.sin(clock.elapsedTime * 0.8) * 0.14;   // 浮遊
+    const sc = 1 + state.pulse * 0.15;
+    mesh.scale.set(sc, sc, sc);
 
     mat.color.setHSL(state.hue, 0.75, 0.55);
     mat.emissive.setHSL(state.hue, 0.8, 0.30 + state.glow * 0.25);
     mat.emissiveIntensity = 0.4 + state.glow * 0.7;
     wire.material.color.setHSL(state.hue, 0.9, 0.85);
+
+    // パーティクルはゆっくり逆回転しつつ明滅
+    particles.rotation.y -= dt * 0.06;
+    particles.position.y = Math.sin(clock.elapsedTime * 0.5) * 0.08;
+    pMat.opacity = 0.38 + Math.sin(clock.elapsedTime * 1.6) * 0.14 + state.glow * 0.12;
 
     renderer.render(scene, camera);
   }
@@ -135,13 +180,17 @@ function mount(canvas) {
 // moodに応じて回転速度・色・発光を設定
 function setMood(mood) {
   if (mood === 'thinking')      { state.targetSpeed = 3.2; state.targetGlow = 1.0; }
+  else if (mood === 'listening'){ state.targetSpeed = 0.9; state.targetGlow = 0.75; }                          // 入力中：耳を傾ける
   else if (mood === 'technical'){ state.targetSpeed = 1.4; state.targetHue = 0.58; state.targetGlow = 0.85; } // やや青緑
   else if (mood === 'athlete')  { state.targetSpeed = 1.2; state.targetHue = 0.72; state.targetGlow = 0.8; }  // 紫寄り
   else if (mood === 'rules')    { state.targetSpeed = 1.1; state.targetHue = 0.50; state.targetGlow = 0.75; } // 水色
   else /* idle */               { state.targetSpeed = 0.35; state.targetHue = 0.53; state.targetGlow = 0.55; }
 }
 
-window.AriaOcta = { mount, setMood };
+// 応答が届いた瞬間のポップ演出
+function pulse() { state.pulse = 1; state.glow = Math.max(state.glow, 1.0); }
+
+window.AriaOcta = { mount, setMood, pulse };
 </script>
 
 <script type="text/babel">
@@ -325,6 +374,7 @@ function App() {
       setTyping(false);
       setMessages(prev => [...prev, { id: Date.now() + 1, role: 'ai', text: data.text }]);
       setChatHistory(data.history);
+      if (window.AriaOcta) window.AriaOcta.pulse();
       setMood(detectMood(q));
       setTimeout(() => setMood('idle'), 6000);
     } catch (err) {
@@ -462,7 +512,7 @@ function App() {
           <div style={{ maxWidth: 720, margin: '0 auto' }}>
             <div style={{ display: 'flex', gap: 10, alignItems: 'flex-end', background: 'var(--bg)', border: '1px solid var(--border)', borderRadius: 12, padding: '10px 12px' }}>
               <textarea ref={inputRef} value={input}
-                onChange={e => { setInput(e.target.value); autoGrow(e.target); }}
+                onChange={e => { setInput(e.target.value); autoGrow(e.target); if (!typing) setMood(e.target.value.trim() ? 'listening' : 'idle'); }}
                 onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }}
                 placeholder="ARIAに質問する…"
                 disabled={typing}
