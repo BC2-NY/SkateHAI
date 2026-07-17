@@ -188,9 +188,9 @@ function setMood(mood) {
   state.mood = mood;
   if (mood === 'thinking')      { state.targetSpeed = 5.5; state.targetGlow = 1.15; }                          // 高速回転＋色相はanimate内で揺らす
   else if (mood === 'listening'){ state.targetSpeed = 0.9; state.targetGlow = 0.75; }                          // 入力中：耳を傾ける
-  else if (mood === 'technical'){ state.targetSpeed = 2.0; state.targetHue = 0.58; state.targetGlow = 0.9; }  // やや青緑
-  else if (mood === 'athlete')  { state.targetSpeed = 1.8; state.targetHue = 0.72; state.targetGlow = 0.85; } // 紫寄り
-  else if (mood === 'rules')    { state.targetSpeed = 1.6; state.targetHue = 0.50; state.targetGlow = 0.8; }  // 水色
+  else if (mood === 'technical'){ state.targetSpeed = 2.0; state.targetHue = 0.35; state.targetGlow = 0.9; }  // 緑
+  else if (mood === 'athlete')  { state.targetSpeed = 1.8; state.targetHue = 0.75; state.targetGlow = 0.85; } // 紫
+  else if (mood === 'rules')    { state.targetSpeed = 1.6; state.targetHue = 0.98; state.targetGlow = 0.8; }  // 赤
   else /* idle */               { state.targetSpeed = 0.35; state.targetHue = 0.53; state.targetGlow = 0.55; }
 }
 
